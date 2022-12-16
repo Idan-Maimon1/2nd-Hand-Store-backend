@@ -4,15 +4,15 @@ const ObjectId = require('mongodb').ObjectId
 const logger = require('../../services/logger.service')
 
 
-async function query(filterBy={}) {
+async function query(filterBy = {}) {
   const collection = await dbService.getCollection('product')
-  
-  if(filterBy) {
+
+  if (filterBy) {
     const criteria = _buildCriteria(filterBy)
-    logger.info('criteria',criteria)
+    logger.info('criteria', criteria)
     var products = await collection.find(criteria).limit(30).toArray()
 
-  }else{
+  } else {
     var products = await collection.find().limit(30).toArray()
   }
   return products
@@ -64,53 +64,16 @@ async function addMsg(productId, msg) {
   update(product)
 }
 
-function _buildCriteria(filterBy = {where:'',label:'',adults:0,children:0,infants:0,pets:0}) {
+function _buildCriteria(filterBy = { category: '', minPrice: 0, maxPrice: 0 }) {
   const criteria = {}
-  if(filterBy.where || filterBy.label || filterBy.adults>0){
+  const { category, minPrice, maxPrice } = filterBy
+  if (category || minPrice || maxPrice && maxPrice !== 150) {
     logger.info(filterBy)
-    const { where, label, adults,children,infants,pets } = filterBy
-    criteria.capacity = { $gte: (+adults + +children + +infants + +pets) }
-    if (where) criteria["address.street"]  = { $regex: where, $options: 'i' }
-    if(label) criteria.label = { $regex: label, $options: 'i' }
-
+    if (category) criteria["category"] = { $regex: category, $options: 'i' }
+    if (minPrice || maxPrice && maxPrice !== 150) {
+      criteria.price = { $gt: +minPrice, $lt: +maxPrice }
+    }
   }
-
-  if(filterBy.minPrice){
-    let minPrice = (+filterBy.minPrice + 0)
-    let maxPrice = (+filterBy.maxPrice + 0)
-    criteria.price = {$gt:minPrice,$lt:maxPrice}
-
-    if(filterBy.beds!=='any') criteria.beds = {$eq:+filterBy.beds}
-
-    if(filterBy.bedRooms!=='any') criteria.bedrooms = {$gte:+filterBy.bedRooms-1}
-
-    if(filterBy?.propertyType) criteria.propertyType = {$regex: filterBy.propertyType, $options: 'i'}
-
-    var roomsTypes = ['entirePlace','privateRoom','sharedRoom']
-    var roomsToFilter = []
-
-    roomsTypes.forEach(room => {
-      let roomType = ''
-      if(room==='entirePlace') roomType = 'Entire home/apt'
-      else if(room==='privateRoom') roomType = 'Private room'
-      else if(room==='sharedRoom') roomType = 'Room'
-      if(filterBy[room]==='true') roomsToFilter.push(roomType)
-    })
-    
-    if(roomsToFilter.length>0) criteria.roomType = { $in: roomsToFilter}
-
-    var amenities = ['wifi','airConditioning','kitchen','washer','freeParking']
-    var amenitiesToFilter = []
-    amenities.forEach(a => {
-      let aminity = a.replace(/([A-Z]+)/g, " $1").toLowerCase()
-      aminity = aminity[0].toUpperCase() + aminity.substring(1);
-      if(filterBy[a]==='true') amenitiesToFilter.push(aminity)
-    })
-    if(amenitiesToFilter.length>0) criteria.amenities = { $all: amenitiesToFilter }
-
-
-  }
-  
   return criteria
 }
 
